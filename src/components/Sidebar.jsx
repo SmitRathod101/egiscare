@@ -11,6 +11,7 @@ import {
   Bell,
   Settings,
   ShieldCheck,
+  History,
   LogOut,
 } from "lucide-react";
 
@@ -33,9 +34,7 @@ function Sidebar() {
       </div>
 
       <nav className="sidebar-nav">
-
         {/* OPERATIONS */}
-
         <p className="nav-section">OPERATIONS</p>
 
         {hasPermission("dashboard") && (
@@ -46,71 +45,75 @@ function Sidebar() {
         )}
 
         {hasPermission("roverManagement") && (
-  <Link to="/rover" className="nav-item">
-    <Bot size={18} />
-    <span>Rover Management</span>
-  </Link>
-)}
+          <Link to="/rover" className="nav-item">
+            <Bot size={18} />
+            <span>Rover Management</span>
+          </Link>
+        )}
 
         {hasPermission("camera") && (
-          <a href="#" className="nav-item">
+          <Link to="/camera" className="nav-item">
             <Camera size={18} />
             <span>Camera Monitoring</span>
-          </a>
+          </Link>
         )}
 
         {hasPermission("roverControl") && (
-          <a href="#" className="nav-item">
+          <Link to="/rover-control" className="nav-item">
             <Gamepad2 size={18} />
             <span>Rover Control</span>
-          </a>
+          </Link>
         )}
 
         {/* CARE & LOGISTICS */}
-
         <p className="nav-section">CARE & LOGISTICS</p>
 
         {hasPermission("tasks") && (
-  <Link to="/tasks" className="nav-item">
-    <ClipboardList size={18} />
-    <span>Tasks & Medicine</span>
-  </Link>
-)}
+          <Link to="/tasks" className="nav-item">
+            <ClipboardList size={18} />
+            <span>Tasks & Medicine</span>
+          </Link>
+        )}
 
         {hasPermission("medicineDelivery") && (
-          <a href="#" className="nav-item">
+          <Link to="/medicine-delivery" className="nav-item">
             <Pill size={18} />
             <span>Medicine Delivery</span>
-          </a>
+          </Link>
         )}
 
         {hasPermission("dashboard") && (
-          <a href="#" className="nav-item">
+          <Link to="/care-recipients" className="nav-item">
             <Users size={18} />
             <span>Care Recipients</span>
-          </a>
+          </Link>
         )}
 
         {/* MONITORING */}
-
         <p className="nav-section">MONITORING</p>
 
         {hasPermission("analytics") && (
-          <a href="#" className="nav-item">
+          <Link to="/analytics" className="nav-item">
             <BarChart3 size={18} />
             <span>Analytics</span>
-          </a>
+          </Link>
         )}
 
         {hasPermission("alerts") && (
-          <a href="#" className="nav-item">
+          <Link to="/alerts" className="nav-item">
             <Bell size={18} />
             <span>Alerts</span>
-          </a>
+          </Link>
+        )}
+
+        {hasPermission("history") && (
+          <Link to="/history" className="nav-item">
+            <History size={18} />
+            <span>Audit History</span>
+          </Link>
         )}
 
         {/* SYSTEM */}
-
         <p className="nav-section">SYSTEM</p>
 
         {hasPermission("users") && (
@@ -121,15 +124,14 @@ function Sidebar() {
         )}
 
         {hasPermission("settings") && (
-          <a href="#" className="nav-item">
+          <Link to="/settings" className="nav-item">
             <Settings size={18} />
             <span>Settings</span>
-          </a>
+          </Link>
         )}
       </nav>
 
       {/* USER / LOGOUT */}
-
       <div className="sidebar-bottom">
         <div className="user-mini">
           <div className="user-avatar">
@@ -138,20 +140,15 @@ function Sidebar() {
 
           <div className="user-info">
             <strong>{user?.name || "User"}</strong>
-
             <span>
               {user?.role
-                ? user.role.charAt(0).toUpperCase() +
-                  user.role.slice(1)
+                ? user.role.charAt(0).toUpperCase() + user.role.slice(1)
                 : "User"}
             </span>
           </div>
         </div>
 
-        <button
-          className="logout-button"
-          onClick={logout}
-        >
+        <button className="logout-button" onClick={logout}>
           <LogOut size={17} />
           <span>Logout</span>
         </button>

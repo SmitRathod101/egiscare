@@ -1,0 +1,28 @@
+{
+  "rover_id": "RVR-001",
+  "backend_url": "http://127.0.0.1:4000",
+  "mqtt_broker_url": "mqtt://127.0.0.1:1883",
+  "rover_secret": "default_rover_secret",
+  "mode": "mock",
+  "telemetry_interval_ms": 3000,
+  "heartbeat_interval_ms": 5000,
+  "hardware": {
+    "motor_driver": "L298N",
+    "left_motor_pins": { "en": 12, "in1": 16, "in2": 18 },
+    "right_motor_pins": { "en": 13, "in3": 22, "in4": 24 },
+    "sensors": {
+      "ultrasonic_front": { "trig": 23, "echo": 24 },
+      "ultrasonic_rear": { "trig": 17, "echo": 27 }
+    },
+    "camera": {
+      "device": "/dev/video0",
+      "resolution": "640x480",
+      "fps": 30
+    },
+    "battery": {
+      "type": "LiPo_3S",
+      "adc_channel": 0,
+      "low_battery_threshold": 20
+    }
+  }
+}

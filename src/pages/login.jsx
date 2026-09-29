@@ -16,59 +16,21 @@ function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const handleLogin = (event) => {
+  const handleLogin = async (event) => {
     event.preventDefault();
     setError("");
+    setLoading(true);
 
-    // Temporary login for frontend development
-    // Temporary login for frontend development
-
-// Admin login
-if (
-  email === "admin@egiscare.com" &&
-  password === "admin123"
-) {
-  login({
-    name: "Admin",
-    email: email,
-    role: "admin",
-  });
-
-  navigate("/dashboard");
-  return;
-}
-
-// Caretaker login
-if (
-  email === "caretaker@egiscare.com" &&
-  password === "caretaker123"
-) {
-  login({
-    name: "Caretaker",
-    email: email,
-    role: "caretaker",
-  });
-
-  navigate("/dashboard");
-  return;
-}
-// Viewer login
-if (
-  email === "viewer@egiscare.com" &&
-  password === "viewer123"
-) {
-  login({
-    name: "Viewer",
-    email: email,
-    role: "viewer",
-  });
-
-  navigate("/dashboard");
-  return;
-}
-
-setError("Invalid email or password.");
+    try {
+      await login(email, password);
+      navigate("/dashboard");
+    } catch (err) {
+      setError(err.message || "Invalid email or password.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -172,8 +134,9 @@ setError("Invalid email or password.");
             <button
               type="submit"
               className="login-button"
+              disabled={loading}
             >
-              Sign in
+              {loading ? "Signing in..." : "Sign in"}
             </button>
 
           </form>

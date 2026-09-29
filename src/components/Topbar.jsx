@@ -4,8 +4,19 @@ import {
   HelpCircle,
   Menu,
 } from "lucide-react";
+import { useAuth } from "../context/AuthContext";
 
 function Topbar() {
+  const { user } = useAuth();
+
+  const getRoleLabel = (role) => {
+    if (!role) return "User";
+    if (role === "admin") return "Administrator";
+    if (role === "caretaker") return "Caretaker";
+    if (role === "viewer") return "System Viewer";
+    return role.charAt(0).toUpperCase() + role.slice(1);
+  };
+
   return (
     <header className="topbar">
       <div className="mobile-menu">
@@ -38,11 +49,13 @@ function Topbar() {
         </button>
 
         <div className="topbar-user">
-          <div className="topbar-avatar">A</div>
+          <div className="topbar-avatar">
+            {user?.name ? user.name.charAt(0).toUpperCase() : "U"}
+          </div>
 
           <div>
-            <strong>Admin</strong>
-            <span>Administrator</span>
+            <strong>{user?.name || "User"}</strong>
+            <span>{getRoleLabel(user?.role)}</span>
           </div>
         </div>
       </div>
