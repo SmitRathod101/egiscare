@@ -30,7 +30,9 @@ function App() {
           path="/dashboard"
           element={
             <ProtectedRoute permission="dashboard">
-              <Dashboard />
+              <DashboardLayout>
+                <Dashboard />
+              </DashboardLayout>
             </ProtectedRoute>
           }
         />

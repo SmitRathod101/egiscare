@@ -6,22 +6,31 @@ import {
   ClipboardList,
   RefreshCw,
   Trash2,
-  X,
+  Search,
 } from "lucide-react";
 import { api } from "../services/api";
+import { useToast } from "../context/ToastContext";
+import Modal from "../components/Modal";
+import ConfirmModal from "../components/ConfirmModal";
 
 function roleIcon(roleInput) {
   const role = (roleInput || "").toLowerCase();
-  if (role === "admin") return <ShieldCheck size={15} />;
-  if (role === "caretaker") return <ClipboardList size={15} />;
-  return <Eye size={15} />;
+  if (role === "admin") return <ShieldCheck size={14} />;
+  if (role === "caretaker") return <ClipboardList size={14} />;
+  return <Eye size={14} />;
 }
 
 function Users() {
+  const { showSuccess, showError } = useToast();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const [deleteTargetId, setDeleteTargetId] = useState(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -39,7 +48,7 @@ function Users() {
         setUsers(res.users);
       }
     } catch (err) {
-      setError(err.message || "Failed to load users");
+      setError(err.message || "Failed to load system users");
     } finally {
       setLoading(false);
     }
@@ -54,13 +63,14 @@ function Users() {
     setSubmitLoading(true);
     try {
       const res = await api.createUser(formData);
+      showSuccess(`User '${formData.name}' created successfully.`);
       if (res && res.user) {
         setUsers((prev) => [...prev, res.user]);
         setShowAddModal(false);
         setFormData({ name: "", email: "", password: "", role: "caretaker" });
       }
     } catch (err) {
-      alert(`Error creating user: ${err.message}`);
+      showError(`Error creating user: ${err.message}`);
     } finally {
       setSubmitLoading(false);
     }
@@ -70,234 +80,283 @@ function Users() {
     const newStatus = userObj.status === "active" ? "inactive" : "active";
     try {
       const res = await api.updateUser(userObj.id, { status: newStatus });
+      showSuccess(`User status updated to '${newStatus}'`);
       if (res && res.user) {
         setUsers((prev) => prev.map((u) => (u.id === userObj.id ? res.user : u)));
       }
     } catch (err) {
-      alert(`Error updating status: ${err.message}`);
+      showError(`Error updating status: ${err.message}`);
     }
   };
 
-  const handleDeleteUser = async (id) => {
-    if (!window.confirm("Are you sure you want to delete this user?")) return;
+  const confirmDeleteUser = async () => {
+    if (!deleteTargetId) return;
+    setDeleteLoading(true);
     try {
-      await api.deleteUser(id);
-      setUsers((prev) => prev.filter((u) => u.id !== id));
+      await api.deleteUser(deleteTargetId);
+      showSuccess("User deleted from system.");
+      setUsers((prev) => prev.filter((u) => u.id !== deleteTargetId));
+      setDeleteTargetId(null);
     } catch (err) {
-      alert(`Error deleting user: ${err.message}`);
+      showError(`Error deleting user: ${err.message}`);
+    } finally {
+      setDeleteLoading(false);
     }
   };
+
+  const filteredUsers = users.filter((u) => {
+    const q = searchQuery.toLowerCase();
+    return (
+      !q ||
+      u.name.toLowerCase().includes(q) ||
+      u.email.toLowerCase().includes(q) ||
+      (u.role && u.role.toLowerCase().includes(q))
+    );
+  });
+
+  if (loading) {
+    return (
+      <div className="users-page" style={{ padding: "60px", textAlign: "center" }}>
+        <RefreshCw className="spin-icon" size={32} color="var(--primary-600)" style={{ margin: "0 auto" }} />
+        <p style={{ marginTop: "16px", color: "var(--slate-600)" }}>Loading access control users...</p>
+      </div>
+    );
+  }
 
   return (
-    <div className="users-page">
+    <div className="users-page" style={{ paddingBottom: "30px" }}>
       <div className="page-heading">
-        <div>
+        <div className="page-heading-left">
           <p className="eyebrow">ACCESS CONTROL</p>
-          <h2>Users & Permissions</h2>
+          <h2>User Management & Roles</h2>
           <p className="page-description">
-            Manage EGISCARE users, roles and system access controls.
+            Manage system access accounts, role-based permissions (Admin, Caretaker, Viewer), and credentials.
           </p>
         </div>
 
-        <button className="primary-action" onClick={() => setShowAddModal(true)}>
-          <UserPlus size={17} />
-          Add User
-        </button>
-      </div>
-
-      {error && (
-        <div className="login-error" style={{ marginBottom: "20px" }}>
-          {error}
-        </div>
-      )}
-
-      <div className="permission-info">
-        <ShieldCheck size={18} />
-        <div>
-          <strong>Role-based access control</strong>
-          <p>
-            Users can only perform actions allowed by their assigned role (Admin, Caretaker, Viewer).
-          </p>
-        </div>
-      </div>
-
-      <div className="users-card">
-        <div className="users-card-header">
-          <div>
-            <h3>System Users</h3>
-            <span>{users.length} users</span>
-          </div>
-          <button className="secondary-action" onClick={fetchUsers} disabled={loading}>
-            <RefreshCw size={14} className={loading ? "spin-icon" : ""} /> Refresh
+        <div className="page-actions">
+          <button className="btn btn-primary" onClick={() => setShowAddModal(true)}>
+            <UserPlus size={16} /> Add New User
+          </button>
+          <button className="btn btn-secondary" onClick={fetchUsers}>
+            <RefreshCw size={15} /> Refresh
           </button>
         </div>
+      </div>
 
+      {error && <div className="login-error" style={{ marginBottom: "24px" }}>{error}</div>}
+
+      <div className="permission-info">
+        <ShieldCheck size={20} color="var(--primary-600)" />
+        <div>
+          <strong>Role-Based Access Control (RBAC) Active</strong>
+          <p>
+            Admins have complete control; Caretakers manage tasks and medication dispatches; Viewers have read-only telemetry monitoring access.
+          </p>
+        </div>
+      </div>
+
+      {/* Filter / Search */}
+      <div
+        className="card"
+        style={{
+          padding: "16px 20px",
+          marginBottom: "24px",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          gap: "16px",
+        }}
+      >
+        <div className="search-box" style={{ width: "280px" }}>
+          <Search size={16} />
+          <input
+            type="text"
+            placeholder="Search name, email or role..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+        </div>
+
+        <span style={{ fontSize: "12.5px", color: "var(--slate-500)" }}>
+          {filteredUsers.length} system accounts
+        </span>
+      </div>
+
+      {/* Users Card & Table */}
+      <div className="users-card">
         <div className="users-table-wrapper">
           <table className="users-table">
             <thead>
               <tr>
-                <th>User</th>
+                <th>User Account</th>
                 <th>Role</th>
                 <th>Status</th>
-                <th>Permissions</th>
+                <th>Permission Level</th>
                 <th>Actions</th>
               </tr>
             </thead>
 
             <tbody>
-              {users.map((u) => {
-                const roleLower = (u.role || "").toLowerCase();
-                const statusLower = (u.status || "active").toLowerCase();
+              {filteredUsers.length === 0 ? (
+                <tr>
+                  <td colSpan={5} style={{ textAlign: "center", padding: "32px", color: "var(--slate-500)" }}>
+                    No users found matching search query.
+                  </td>
+                </tr>
+              ) : (
+                filteredUsers.map((u) => {
+                  const roleLower = (u.role || "").toLowerCase();
+                  const statusLower = (u.status || "active").toLowerCase();
 
-                return (
-                  <tr key={u.id}>
-                    <td>
-                      <div className="table-user">
-                        <div className="table-avatar">
-                          {u.name ? u.name.charAt(0).toUpperCase() : "U"}
+                  return (
+                    <tr key={u.id}>
+                      <td>
+                        <div className="table-user">
+                          <div className="table-avatar">
+                            {u.name ? u.name.charAt(0).toUpperCase() : "U"}
+                          </div>
+                          <div>
+                            <strong>{u.name}</strong>
+                            <span>{u.email}</span>
+                          </div>
                         </div>
-                        <div>
-                          <strong>{u.name}</strong>
-                          <span>{u.email}</span>
+                      </td>
+
+                      <td>
+                        <div className={`role-badge ${roleLower}`}>
+                          {roleIcon(u.role)}
+                          {u.role ? u.role.charAt(0).toUpperCase() + u.role.slice(1) : "User"}
                         </div>
-                      </div>
-                    </td>
+                      </td>
 
-                    <td>
-                      <div className={`role-badge ${roleLower}`}>
-                        {roleIcon(u.role)}
-                        {u.role ? u.role.charAt(0).toUpperCase() + u.role.slice(1) : "User"}
-                      </div>
-                    </td>
-
-                    <td>
-                      <button
-                        onClick={() => handleStatusToggle(u)}
-                        style={{ background: "transparent", border: "none", cursor: "pointer" }}
-                      >
-                        <span className={`user-status ${statusLower}`}>
-                          <span></span>
-                          {u.status ? u.status.charAt(0).toUpperCase() + u.status.slice(1) : "Active"}
-                        </span>
-                      </button>
-                    </td>
-
-                    <td>
-                      <span className="permission-text">
-                        {roleLower === "admin"
-                          ? "Full system access"
-                          : roleLower === "caretaker"
-                          ? "Tasks & deliveries"
-                          : "Monitoring only"}
-                      </span>
-                    </td>
-
-                    <td>
-                      {u.email !== "admin@egiscare.com" && (
+                      <td>
                         <button
-                          className="more-button"
-                          style={{ color: "#ef4444" }}
-                          onClick={() => handleDeleteUser(u.id)}
-                          title="Delete User"
+                          onClick={() => handleStatusToggle(u)}
+                          style={{ background: "transparent", border: "none", cursor: "pointer", padding: 0 }}
+                          title="Click to toggle status"
                         >
-                          <Trash2 size={16} />
+                          <span className={`user-status ${statusLower}`}>
+                            <span></span>
+                            {u.status ? u.status.charAt(0).toUpperCase() + u.status.slice(1) : "Active"}
+                          </span>
                         </button>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
+                      </td>
+
+                      <td>
+                        <span style={{ fontSize: "12.5px", color: "var(--slate-600)" }}>
+                          {roleLower === "admin"
+                            ? "Full system administrative control"
+                            : roleLower === "caretaker"
+                            ? "Task dispatch & medicine delivery"
+                            : "Read-only telematics monitoring"}
+                        </span>
+                      </td>
+
+                      <td>
+                        {u.email !== "admin@egiscare.com" ? (
+                          <button
+                            className="btn btn-ghost btn-sm"
+                            style={{ color: "var(--danger-solid)", padding: "6px" }}
+                            onClick={() => setDeleteTargetId(u.id)}
+                            title="Delete Account"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        ) : (
+                          <span style={{ fontSize: "11px", color: "var(--slate-400)", fontWeight: 600 }}>
+                            Root Admin
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
             </tbody>
           </table>
         </div>
       </div>
 
       {/* Add User Modal */}
-      {showAddModal && (
-        <div className="modal-overlay" style={{
-          position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
-          background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000
-        }}>
-          <div className="modal-card" style={{
-            background: "#fff", padding: "24px", borderRadius: "12px", width: "400px", maxWidth: "90%"
-          }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
-              <h3 style={{ margin: 0 }}>Add New User</h3>
-              <button onClick={() => setShowAddModal(false)} style={{ background: "none", border: "none", cursor: "pointer" }}>
-                <X size={20} />
-              </button>
-            </div>
-
-            <form onSubmit={handleCreateUser}>
-              <div className="form-group" style={{ marginBottom: "12px" }}>
-                <label>Full Name</label>
-                <input
-                  type="text"
-                  required
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="Jane Doe"
-                  style={{ width: "100%", padding: "8px", borderRadius: "6px", border: "1px solid #cbd5e1" }}
-                />
-              </div>
-
-              <div className="form-group" style={{ marginBottom: "12px" }}>
-                <label>Email Address</label>
-                <input
-                  type="email"
-                  required
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  placeholder="jane@egiscare.com"
-                  style={{ width: "100%", padding: "8px", borderRadius: "6px", border: "1px solid #cbd5e1" }}
-                />
-              </div>
-
-              <div className="form-group" style={{ marginBottom: "12px" }}>
-                <label>Password</label>
-                <input
-                  type="password"
-                  required
-                  value={formData.password}
-                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  placeholder="••••••••"
-                  style={{ width: "100%", padding: "8px", borderRadius: "6px", border: "1px solid #cbd5e1" }}
-                />
-              </div>
-
-              <div className="form-group" style={{ marginBottom: "16px" }}>
-                <label>Role</label>
-                <select
-                  value={formData.role}
-                  onChange={(e) => setFormData({ ...formData, role: e.target.value })}
-                  style={{ width: "100%", padding: "8px", borderRadius: "6px", border: "1px solid #cbd5e1" }}
-                >
-                  <option value="admin">Admin</option>
-                  <option value="caretaker">Caretaker</option>
-                  <option value="viewer">Viewer</option>
-                </select>
-              </div>
-
-              <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px" }}>
-                <button
-                  type="button"
-                  onClick={() => setShowAddModal(false)}
-                  style={{ padding: "8px 16px", borderRadius: "6px", border: "1px solid #cbd5e1", background: "#f8fafc" }}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={submitLoading}
-                  style={{ padding: "8px 16px", borderRadius: "6px", border: "none", background: "#2563eb", color: "#fff" }}
-                >
-                  {submitLoading ? "Creating..." : "Create User"}
-                </button>
-              </div>
-            </form>
+      <Modal
+        isOpen={showAddModal}
+        onClose={() => setShowAddModal(false)}
+        title="Add New System User"
+        description="Create an account and assign system access permissions"
+        maxWidth="440px"
+      >
+        <form onSubmit={handleCreateUser}>
+          <div className="form-group">
+            <label>Full Name</label>
+            <input
+              type="text"
+              required
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              placeholder="e.g. Jane Doe"
+            />
           </div>
-        </div>
-      )}
+
+          <div className="form-group">
+            <label>Email Address</label>
+            <input
+              type="email"
+              required
+              value={formData.email}
+              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+              placeholder="jane@egiscare.com"
+            />
+          </div>
+
+          <div className="form-group">
+            <label>Password</label>
+            <input
+              type="password"
+              required
+              value={formData.password}
+              onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+              placeholder="••••••••"
+            />
+          </div>
+
+          <div className="form-group">
+            <label>Role</label>
+            <select
+              value={formData.role}
+              onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+            >
+              <option value="admin">Administrator (Full Access)</option>
+              <option value="caretaker">Caretaker (Tasks & Deliveries)</option>
+              <option value="viewer">System Viewer (Read-Only)</option>
+            </select>
+          </div>
+
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", marginTop: "20px" }}>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => setShowAddModal(false)}
+            >
+              Cancel
+            </button>
+            <button type="submit" className="btn btn-primary" disabled={submitLoading}>
+              {submitLoading ? "Creating..." : "Create Account"}
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Confirm Delete Modal */}
+      <ConfirmModal
+        isOpen={!!deleteTargetId}
+        onClose={() => setDeleteTargetId(null)}
+        onConfirm={confirmDeleteUser}
+        title="Delete User Account"
+        message="Are you sure you want to delete this account? This action cannot be undone."
+        confirmText="Delete User"
+        loading={deleteLoading}
+      />
     </div>
   );
 }

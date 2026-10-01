@@ -8,19 +8,23 @@ import {
   Activity,
   Navigation,
   RefreshCw,
-  AlertTriangle,
   Play,
   Square,
   Home,
   ShieldAlert,
+  Cpu,
+  Radio,
+  Sliders,
 } from "lucide-react";
 
 import { useAuth } from "../context/AuthContext";
 import { api } from "../services/api";
 import { useWebSocket } from "../hooks/useWebSocket";
+import { useToast } from "../context/ToastContext";
 
 function RoverManagement() {
   const { user } = useAuth();
+  const { showSuccess, showError } = useToast();
 
   const [rover, setRover] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -36,7 +40,7 @@ function RoverManagement() {
         setRover(res.rover);
       }
     } catch (err) {
-      setError(err.message || "Failed to load rover data");
+      setError(err.message || "Failed to load rover telematics");
     } finally {
       setLoading(false);
     }
@@ -66,11 +70,12 @@ function RoverManagement() {
     setCommandLoading(true);
     try {
       const res = await api.sendRoverCommand(rover.rover_id || "RVR-001", command);
+      showSuccess(`Command '${command}' dispatched successfully.`);
       if (res && res.rover) {
         setRover(res.rover);
       }
     } catch (err) {
-      alert(`Command error: ${err.message}`);
+      showError(`Command error: ${err.message}`);
     } finally {
       setCommandLoading(false);
     }
@@ -85,9 +90,11 @@ function RoverManagement() {
 
   if (loading && !rover) {
     return (
-      <div className="rover-management-page" style={{ padding: "40px", textAlign: "center" }}>
-        <RefreshCw className="spin-icon" size={28} style={{ animation: "spin 1s linear infinite" }} />
-        <p style={{ marginTop: "12px", color: "#64748b" }}>Loading rover telematics...</p>
+      <div className="rover-management-page" style={{ padding: "60px", textAlign: "center" }}>
+        <RefreshCw className="spin-icon" size={32} color="var(--primary-600)" style={{ margin: "0 auto" }} />
+        <p style={{ marginTop: "16px", color: "var(--slate-600)", fontWeight: 500 }}>
+          Connecting to EGISCARE telemetry stream...
+        </p>
       </div>
     );
   }
@@ -95,29 +102,31 @@ function RoverManagement() {
   const isOnline = rover?.status !== "Offline" && rover?.connection_status !== "Disconnected";
 
   return (
-    <div className="rover-management-page">
+    <div className="rover-management-page" style={{ paddingBottom: "30px" }}>
       <div className="page-heading">
-        <div>
+        <div className="page-heading-left">
           <p className="eyebrow">ROVER OPERATIONS</p>
-          <h2>Rover Management</h2>
+          <h2>Rover Management & Telematics</h2>
           <p className="page-description">
-            Monitor real-time health, connection status, and telematics for the EGISCARE rover.
+            Monitor hardware health, connection status, motor parameters, and real-time mission state.
           </p>
         </div>
 
-        <button className="secondary-action" onClick={fetchRoverStatus} disabled={loading}>
-          <RefreshCw size={15} className={loading ? "spin-icon" : ""} />
-          Refresh Status
-        </button>
+        <div className="page-actions">
+          <button
+            className="btn btn-secondary"
+            onClick={fetchRoverStatus}
+            disabled={loading}
+          >
+            <RefreshCw size={15} className={loading ? "spin-icon" : ""} />
+            Sync Telemetry
+          </button>
+        </div>
       </div>
 
-      {error && (
-        <div className="login-error" style={{ marginBottom: "20px" }}>
-          {error}
-        </div>
-      )}
+      {error && <div className="login-error" style={{ marginBottom: "24px" }}>{error}</div>}
 
-      {/* Rover overview */}
+      {/* Rover Overview Card */}
       <div className="rover-overview-card">
         <div className="rover-main-info">
           <div className="large-rover-icon">
@@ -127,27 +136,28 @@ function RoverManagement() {
           <div>
             <div className="rover-title-row">
               <h3>{rover?.name || "EGISCARE Rover"}</h3>
-              <span className={`rover-status ${isOnline ? "online" : "offline"}`}>
+              <span className={`badge ${isOnline ? "badge-success" : "badge-danger"}`}>
                 <span className="status-dot"></span>
                 {rover?.status || "Offline"}
               </span>
             </div>
 
-            <p>{rover?.rover_id || "RVR-001"}</p>
+            <p style={{ margin: "2px 0 0 0", color: "var(--slate-500)", fontSize: "12px", fontFamily: "var(--font-mono)" }}>
+              ID: {rover?.rover_id || "RVR-001"}
+            </p>
 
-            <span className="connection-text">
+            <span className="connection-text" style={{ color: wsConnected ? "var(--success-text)" : "var(--warning-text)" }}>
               <Wifi size={13} />
-              {wsConnected ? "Live WebSocket Stream Active" : "Polling REST Endpoint"}
+              {wsConnected ? "WebSocket Telemetry Active (3000ms heartbeat)" : "REST Polling Endpoint Active (WS Offline)"}
             </span>
           </div>
         </div>
 
         <div className="rover-overview-actions">
           {user?.role !== "viewer" && (
-            <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+            <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
               <button
-                className="secondary-action"
-                style={{ background: "#22c55e", color: "#fff", borderColor: "#22c55e" }}
+                className="btn btn-primary btn-sm"
                 disabled={commandLoading}
                 onClick={() => handleCommand("START")}
               >
@@ -155,15 +165,15 @@ function RoverManagement() {
               </button>
 
               <button
-                className="secondary-action"
+                className="btn btn-secondary btn-sm"
                 disabled={commandLoading}
                 onClick={() => handleCommand("STOP")}
               >
-                <Square size={14} /> Stop
+                <Square size={14} /> Hold
               </button>
 
               <button
-                className="secondary-action"
+                className="btn btn-secondary btn-sm"
                 disabled={commandLoading}
                 onClick={() => handleCommand("RETURN_HOME")}
               >
@@ -171,8 +181,7 @@ function RoverManagement() {
               </button>
 
               <button
-                className="secondary-action"
-                style={{ background: "#ef4444", color: "#fff", borderColor: "#ef4444", fontWeight: "bold" }}
+                className="btn btn-danger btn-sm"
                 disabled={commandLoading}
                 onClick={() => handleCommand("EMERGENCY_STOP")}
               >
@@ -183,72 +192,74 @@ function RoverManagement() {
         </div>
       </div>
 
-      {/* Rover metrics */}
+      {/* Rover Metrics */}
       <div className="rover-metrics">
         <div className="rover-metric-card">
           <div className="metric-icon green">
-            <Battery size={19} />
+            <Battery size={20} />
           </div>
           <div>
-            <span>Battery</span>
+            <span>Battery Level</span>
             <strong>{rover?.battery ?? 0}%</strong>
-            <small>{rover?.battery < 20 ? "Low Battery Warning" : "Good condition"}</small>
+            <small>{rover?.battery < 20 ? "Low Battery Warning" : "LiPo 3S Nominal"}</small>
           </div>
         </div>
 
         <div className="rover-metric-card">
           <div className="metric-icon blue">
-            <Wifi size={19} />
+            <Wifi size={20} />
           </div>
           <div>
             <span>Connection</span>
             <strong>{rover?.connection_status || (isOnline ? "Connected" : "Offline")}</strong>
-            <small>{wsConnected ? "WebSocket Live" : "REST Sync"}</small>
+            <small>{wsConnected ? "Live Socket Link" : "MQTT / HTTP"}</small>
           </div>
         </div>
 
         <div className="rover-metric-card">
           <div className="metric-icon purple">
-            <Clock3 size={19} />
+            <Clock3 size={20} />
           </div>
           <div>
-            <span>Uptime</span>
+            <span>Active Uptime</span>
             <strong>{formatUptime(rover?.uptime_sec)}</strong>
-            <small>Active session</small>
+            <small>Current Session</small>
           </div>
         </div>
 
         <div className="rover-metric-card">
           <div className="metric-icon orange">
-            <Activity size={19} />
+            <Activity size={20} />
           </div>
           <div>
-            <span>Current Task</span>
+            <span>Current Mission</span>
             <strong>{rover?.current_task || "Idle"}</strong>
-            <small>Logistics & Patrol</small>
+            <small>Autonomous Dispatch</small>
           </div>
         </div>
       </div>
 
-      {/* Current operation & system info */}
+      {/* Rover Panels */}
       <div className="rover-management-grid">
         <section className="rover-panel">
-          <div className="panel-heading">
+          <div className="section-heading">
             <div>
-              <p className="section-label">CURRENT OPERATION</p>
-              <h3>{rover?.current_task || "System Patrol"}</h3>
+              <p className="section-label">NAVIGATION ROUTE</p>
+              <h3>Current Path & Location</h3>
             </div>
-            <span className="operation-badge">{rover?.status || "Idle"}</span>
+            <span className="badge badge-info">{rover?.status || "Idle"}</span>
           </div>
 
           <div className="operation-route">
             <div className="route-point">
               <div className="route-icon start">
-                <MapPin size={16} />
+                <MapPin size={18} />
               </div>
               <div>
-                <span>Current Location</span>
-                <strong>{rover?.location || "Care Wing A"}</strong>
+                <span style={{ fontSize: "12px", color: "var(--slate-500)" }}>Current Node</span>
+                <strong style={{ fontSize: "14px", color: "var(--slate-900)" }}>
+                  {rover?.location || "Care Wing A — Corridor 1"}
+                </strong>
               </div>
             </div>
 
@@ -256,43 +267,50 @@ function RoverManagement() {
 
             <div className="route-point">
               <div className="route-icon destination">
-                <Navigation size={16} />
+                <Navigation size={18} />
               </div>
               <div>
-                <span>Target Node</span>
-                <strong>Care Room 203</strong>
+                <span style={{ fontSize: "12px", color: "var(--slate-500)" }}>Target Waypoint</span>
+                <strong style={{ fontSize: "14px", color: "var(--slate-900)" }}>
+                  Room 203 (Medication Delivery)
+                </strong>
               </div>
             </div>
           </div>
         </section>
 
         <section className="rover-panel">
-          <div className="panel-heading">
+          <div className="section-heading">
             <div>
-              <p className="section-label">SYSTEM</p>
-              <h3>Rover Information</h3>
+              <p className="section-label">SYSTEM HARDWARE</p>
+              <h3>Specifications & Subsystems</h3>
             </div>
           </div>
 
           <div className="system-info-list">
             <div>
-              <span>Rover ID</span>
+              <span>Rover Unit Identifier</span>
               <strong>{rover?.rover_id || "RVR-001"}</strong>
             </div>
 
             <div>
-              <span>Firmware</span>
-              <strong>{rover?.firmware || "v1.0.4"}</strong>
+              <span>Controller Platform</span>
+              <strong>Raspberry Pi Agent (Python HAL)</strong>
             </div>
 
             <div>
-              <span>Controller</span>
-              <strong>Raspberry Pi Agent</strong>
+              <span>Firmware Version</span>
+              <strong>{rover?.firmware || "v1.0.4-prod"}</strong>
             </div>
 
             <div>
-              <span>Backend Communication</span>
-              <strong>MQTT + WebSocket</strong>
+              <span>Telematics Protocol</span>
+              <strong>MQTT + WebSocket Broker</strong>
+            </div>
+
+            <div>
+              <span>Camera Optics</span>
+              <strong>Front Optical Cam (640x480)</strong>
             </div>
           </div>
         </section>

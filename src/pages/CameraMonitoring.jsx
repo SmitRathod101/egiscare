@@ -5,20 +5,21 @@ import {
   Play,
   Pause,
   Maximize2,
-  RefreshCw,
   Sun,
   Moon,
   Wifi,
   Radio,
+  Sliders,
 } from "lucide-react";
 import { api } from "../services/api";
+import { useToast } from "../context/ToastContext";
 
 function CameraMonitoring() {
+  const { showSuccess, showInfo } = useToast();
   const [streaming, setStreaming] = useState(true);
-  const [snapshot, setSnapshot] = useState(null);
   const [nightVision, setNightVision] = useState(false);
   const [rover, setRover] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   useEffect(() => {
     async function loadRoverData() {
@@ -29,8 +30,6 @@ function CameraMonitoring() {
         }
       } catch (err) {
         console.error("Camera page rover load error:", err);
-      } finally {
-        setLoading(false);
       }
     }
     loadRoverData();
@@ -38,105 +37,100 @@ function CameraMonitoring() {
 
   const handleTakeSnapshot = () => {
     const timestamp = new Date().toLocaleTimeString();
-    setSnapshot(`Captured snapshot at ${timestamp}`);
-    setTimeout(() => setSnapshot(null), 4000);
+    showSuccess(`Snapshot captured successfully at ${timestamp} (CAM-01 saved)`);
+  };
+
+  const toggleStreaming = () => {
+    setStreaming((prev) => {
+      const next = !prev;
+      if (next) showInfo("Camera stream resumed.");
+      else showInfo("Camera stream paused.");
+      return next;
+    });
   };
 
   return (
-    <div className="camera-monitoring-page" style={{ paddingBottom: "24px" }}>
+    <div className="camera-monitoring-page" style={{ paddingBottom: "30px" }}>
       <div className="page-heading">
-        <div>
+        <div className="page-heading-left">
           <p className="eyebrow">ROVER OPERATIONS</p>
-          <h2>Camera Monitoring</h2>
+          <h2>Live Camera Feed</h2>
           <p className="page-description">
-            Live video feed and optical monitoring from the EGISCARE autonomous rover camera assembly.
+            Optical monitoring and real-time video telemetry stream from the EGISCARE rover front camera assembly.
           </p>
         </div>
 
-        <div style={{ display: "flex", gap: "10px" }}>
-          <button
-            className="secondary-action"
-            onClick={() => setStreaming(!streaming)}
-          >
+        <div className="page-actions">
+          <button className="btn btn-secondary" onClick={toggleStreaming}>
             {streaming ? <Pause size={15} /> : <Play size={15} />}
             {streaming ? "Pause Stream" : "Resume Stream"}
           </button>
-          <button className="primary-action" onClick={handleTakeSnapshot}>
+          <button className="btn btn-primary" onClick={handleTakeSnapshot}>
             <Camera size={15} />
             Capture Snapshot
           </button>
         </div>
       </div>
 
-      {snapshot && (
-        <div
-          className="login-error"
-          style={{
-            background: "#dcfce7",
-            color: "#15803d",
-            borderColor: "#86efac",
-            marginBottom: "20px",
-          }}
-        >
-          📷 {snapshot}
-        </div>
-      )}
-
       {/* Main Stream Viewport */}
       <div
-        className="camera-viewport-card"
+        className="card"
         style={{
           background: "#0f172a",
           borderRadius: "16px",
           overflow: "hidden",
           border: "1px solid #1e293b",
-          boxShadow: "0 10px 25px -5px rgba(0,0,0,0.3)",
+          boxShadow: "0 20px 25px -5px rgba(0,0,0,0.3)",
           position: "relative",
-          marginBottom: "24px",
+          padding: 0,
         }}
       >
-        {/* Stream Top Bar */}
+        {/* Stream Header */}
         <div
           style={{
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
             padding: "14px 20px",
-            background: "rgba(15, 23, 42, 0.8)",
-            backdropFilter: "blur(8px)",
+            background: "rgba(15, 23, 42, 0.9)",
             borderBottom: "1px solid #334155",
             color: "#f8fafc",
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-            <Radio size={16} color="#22c55e" className="spin-icon" />
-            <strong style={{ fontSize: "14px", letterSpacing: "0.5px" }}>
+            <Radio size={16} color="#10b981" className={streaming ? "spin-icon" : ""} />
+            <strong style={{ fontSize: "13px", letterSpacing: "0.5px" }}>
               CAM-01 • PRIMARY FRONT OPTICAL FEED
             </strong>
             <span
-              style={{
-                fontSize: "11px",
-                background: streaming ? "#166534" : "#991b1b",
-                color: "#fff",
-                padding: "2px 8px",
-                borderRadius: "12px",
-                fontWeight: 600,
-              }}
+              className={`badge ${streaming ? "badge-success" : "badge-danger"}`}
+              style={{ fontSize: "10px", padding: "2px 8px" }}
             >
-              {streaming ? "LIVE" : "PAUSED"}
+              {streaming ? "LIVE 30FPS" : "PAUSED"}
             </span>
           </div>
 
-          <div style={{ display: "flex", alignItems: "center", gap: "16px", fontSize: "13px", color: "#94a3b8" }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "16px",
+              fontSize: "12px",
+              color: "#94a3b8",
+            }}
+          >
             <span>640 x 480 @ 30 FPS</span>
-            <span><Wifi size={13} style={{ display: "inline", marginRight: "4px" }} /> {rover?.status || "Online"}</span>
+            <span>
+              <Wifi size={13} style={{ display: "inline", marginRight: "4px" }} />
+              {rover?.status || "Online"}
+            </span>
           </div>
         </div>
 
-        {/* Video Frame Canvas / Placeholder */}
+        {/* Video Canvas / Viewport */}
         <div
           style={{
-            height: "420px",
+            height: isFullscreen ? "70vh" : "440px",
             display: "flex",
             flexDirection: "column",
             alignItems: "center",
@@ -146,21 +140,23 @@ function CameraMonitoring() {
               ? "radial-gradient(circle, #064e3b 0%, #022c22 100%)"
               : "radial-gradient(circle, #1e293b 0%, #0f172a 100%)",
             color: "#94a3b8",
+            transition: "all 0.3s ease",
           }}
         >
-          {/* Simulated HUD Elements */}
+          {/* HUD Overlay Elements */}
           <div
             style={{
               position: "absolute",
               top: "20px",
               left: "20px",
-              fontFamily: "monospace",
-              fontSize: "12px",
+              fontFamily: "var(--font-mono)",
+              fontSize: "11px",
               color: nightVision ? "#4ade80" : "#38bdf8",
+              lineHeight: 1.6,
             }}
           >
-            <div>MODE: {nightVision ? "NIGHT VISION (IR)" : "STANDARD COLOR"}</div>
-            <div>TARGET NODE: {rover?.location || "Care Wing A"}</div>
+            <div>OPTICS MODE: {nightVision ? "NIGHT VISION (IR ACTIVE)" : "STANDARD COLOR"}</div>
+            <div>LOCATION: {rover?.location || "Care Wing A Corridor"}</div>
             <div>BATTERY: {rover?.battery ?? 88}%</div>
           </div>
 
@@ -169,41 +165,48 @@ function CameraMonitoring() {
               position: "absolute",
               top: "20px",
               right: "20px",
-              fontFamily: "monospace",
-              fontSize: "12px",
+              fontFamily: "var(--font-mono)",
+              fontSize: "11px",
               color: "#94a3b8",
             }}
           >
-            {new Date().toISOString()}
+            SYS TIME: {new Date().toISOString()}
           </div>
 
-          {/* Center Crosshair / Video Indicator */}
+          {/* Crosshair / Viewfinder Target */}
           <div
             style={{
-              width: "120px",
-              height: "120px",
+              width: "130px",
+              height: "130px",
               border: `2px dashed ${nightVision ? "#4ade80" : "#38bdf8"}`,
               borderRadius: "50%",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              opacity: 0.6,
+              opacity: 0.7,
             }}
           >
-            <Video size={40} color={nightVision ? "#4ade80" : "#38bdf8"} />
+            <Video size={42} color={nightVision ? "#4ade80" : "#38bdf8"} />
           </div>
 
-          <p style={{ marginTop: "16px", fontSize: "14px", color: nightVision ? "#4ade80" : "#cbd5e1" }}>
+          <p
+            style={{
+              marginTop: "20px",
+              fontSize: "14px",
+              fontWeight: 500,
+              color: nightVision ? "#4ade80" : "#cbd5e1",
+            }}
+          >
             {streaming
-              ? "Development Camera Stream Active — Hardware Video Pipeline Ready"
-              : "Stream Paused by Operator"}
+              ? "Pi Camera Module Stream Ready — Optical Pipeline Online"
+              : "Camera Feed Paused by Operator"}
           </p>
           <small style={{ color: "#64748b" }}>
-            Raspberry Pi Camera Module ready for MJPEG / HLS stream embedding
+            WebRTC / MJPEG Stream Endpoint connected to backend video service
           </small>
         </div>
 
-        {/* Bottom Control Bar */}
+        {/* Viewport Control Bar */}
         <div
           style={{
             display: "flex",
@@ -214,13 +217,16 @@ function CameraMonitoring() {
             borderTop: "1px solid #334155",
           }}
         >
-          <div style={{ display: "flex", gap: "8px" }}>
+          <div style={{ display: "flex", gap: "10px" }}>
             <button
-              className="secondary-action"
-              onClick={() => setNightVision(!nightVision)}
+              className="btn btn-sm btn-secondary"
+              onClick={() => {
+                setNightVision(!nightVision);
+                showInfo(nightVision ? "Switched to Day Color Mode" : "Night Vision IR Mode Enabled");
+              }}
               style={{
                 background: nightVision ? "#065f46" : "#1e293b",
-                color: "#fff",
+                color: "#ffffff",
                 borderColor: nightVision ? "#10b981" : "#475569",
               }}
             >
@@ -229,9 +235,13 @@ function CameraMonitoring() {
             </button>
           </div>
 
-          <div style={{ display: "flex", gap: "8px" }}>
-            <button className="secondary-action" style={{ background: "#1e293b", color: "#fff" }}>
-              <Maximize2 size={14} /> Fullscreen
+          <div style={{ display: "flex", gap: "10px" }}>
+            <button
+              className="btn btn-sm btn-secondary"
+              onClick={() => setIsFullscreen(!isFullscreen)}
+              style={{ background: "#1e293b", color: "#ffffff", borderColor: "#475569" }}
+            >
+              <Maximize2 size={14} /> {isFullscreen ? "Exit Fullscreen" : "Fullscreen View"}
             </button>
           </div>
         </div>
